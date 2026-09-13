@@ -2,6 +2,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
 from .models import User
+from rest_framework_simplejwt.tokens import RefreshToken
 
 class RegisterTestCase(APITestCase):
 
@@ -478,4 +479,172 @@ class LoginTestCase(APITestCase):
         self.assertEqual(
             profile_response.status_code,
             status.HTTP_200_OK
+        )
+        
+        
+class ProfileTestCase(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123",
+            first_name="amir",
+            last_name="amiri",
+            address="yazd"
+        )
+            
+    def test_get_profile(self):
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        response = self.client.get(
+            reverse("profile")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["email"],
+            "amir@example.com"
+        )
+    
+    def test_get_profile_without_authentication(self):
+        response = self.client.get(
+            reverse("profile")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+        
+    def test_update_profile(self):
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        data = {
+            "first_name": "ali",
+            "last_name": "alavi",
+            "phone_number": "09111111111",
+            "address": "tehran"
+        }
+
+        response = self.client.put(
+            reverse("profile"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["first_name"],
+            "ali"
+        )
+
+        self.assertEqual(
+            response.data["address"],
+            "tehran"
+        )
+        
+    def test_partial_update_profile(self):
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        data = {
+            "first_name": "ali",
+        }
+
+        response = self.client.patch(
+            reverse("profile"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["first_name"],
+            "ali"
+        )
+
+        self.assertEqual(
+            response.data["last_name"],
+            "amiri"
+        )
+
+    def test_email_cannot_be_updated(self):
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        data = {
+            "email": "ali@gmail.com"
+        }
+
+        response = self.client.patch(
+            reverse("profile"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["email"],
+            "amir@example.com"
+        )
+
+    def test_profile_returns_correct_user(self):
+        another_user = User.objects.create_user(
+            email="ali@example.com",
+            phone_number="09111111111",
+            password="testpassword123",
+            first_name="ali",
+            last_name="alavi"
+        )
+
+        refresh = RefreshToken.for_user(self.user)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}"
+        )
+
+        response = self.client.get(
+            reverse("profile")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["email"],
+            self.user.email
+        )
+
+        self.assertNotEqual(
+            response.data["email"],
+            another_user.email
         )
