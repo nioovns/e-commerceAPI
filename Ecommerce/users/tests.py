@@ -193,7 +193,7 @@ class RegisterTestCase(APITestCase):
             response.data
         )
 
-    def test_password_not_returned(self):       
+    def test_password_not_returned(self):
         data = {
             "first_name": "amir",
             "last_name": "amiri",
@@ -249,4 +249,233 @@ class RegisterTestCase(APITestCase):
 
         self.assertTrue(
             user.check_password("testpassword123")
+        )
+        
+
+class LoginTestCase(APITestCase):
+
+    def test_login_success(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+
+        data = {
+            "email": "amir@example.com",
+            "password": "testpassword123"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertIn(
+            "access",
+            response.data
+        )
+
+        self.assertIn(
+            "refresh",
+            response.data
+        )
+
+    def test_login_wrong_email(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+
+        data = {
+            "email": "amirmm@example.com",
+            "password": "testpassword123"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        self.assertNotIn(
+            "access",
+            response.data
+        )
+
+        self.assertNotIn(
+            "refresh",
+            response.data
+        )
+               
+    def test_login_wrong_password(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+
+        data = {
+            "email": "amir@example.com",
+            "password": "testpassword1234"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+        self.assertNotIn(
+            "access",
+            response.data
+        )
+
+        self.assertNotIn(
+            "refresh",
+            response.data
+        )
+    
+    def test_login_inactive_user(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+        user = User.objects.get(
+            email="amir@example.com"
+        )
+        user.is_active = False
+        user.save()
+        
+        data = {
+            "email": "amir@example.com",
+            "password": "testpassword123"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+        self.assertNotIn(
+            "access",
+            response.data
+        )
+
+        self.assertNotIn(
+            "refresh",
+            response.data
+        )
+        
+    def test_login_without_email(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+
+        data = {
+            "password": "testpassword1234"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+        self.assertNotIn(
+            "access",
+            response.data
+        )
+
+        self.assertNotIn(
+            "refresh",
+            response.data
+        )
+        
+    def test_login_without_password(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+
+        data = {
+            "email": "amir@example.com"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+        self.assertNotIn(
+            "access",
+            response.data
+        )
+
+        self.assertNotIn(
+            "refresh",
+            response.data
+        )
+        
+    def test_login_token_is_valid(self):
+        User.objects.create_user(
+            email="amir@example.com",
+            phone_number="09123456789",
+            password="testpassword123"
+        )
+
+        data = {
+            "email": "amir@example.com",
+            "password": "testpassword123"
+        }
+
+        response = self.client.post(
+            reverse("login"),
+            data
+        )
+
+        access_token = response.data["access"]
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {access_token}"
+        )
+
+        profile_response = self.client.get(
+            reverse("profile")
+        )
+
+        self.assertEqual(
+            profile_response.status_code,
+            status.HTTP_200_OK
         )
