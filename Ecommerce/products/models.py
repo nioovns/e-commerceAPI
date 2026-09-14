@@ -44,7 +44,7 @@ class ProductImage(models.Model):
         related_name="images"
     )
     image = models.ImageField(
-        upload_to="products/"
+        upload_to="products/images/"
     )
     is_primary = models.BooleanField(
         default=False

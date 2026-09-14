@@ -135,6 +135,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "E-commerce API",
     "DESCRIPTION": "E-commerce REST API",
     "VERSION": "1.0.0",
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
