@@ -3,7 +3,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from .models import Category, Product, ProductImage
 from users.models import User
-
+from django.core.files.uploadedfile import SimpleUploadedFile
+from io import BytesIO
+from PIL import Image
 
 class CategoryAPITestCase(APITestCase):
     def setUp(self):
@@ -921,5 +923,540 @@ class ProductAPITestCase(APITestCase):
             response.status_code,
             status.HTTP_401_UNAUTHORIZED
         )
-        
     
+        
+class ProductImageAPITestCase(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="admin@test.com",
+            password="Admin12345",
+            phone_number="09123456789",
+            is_staff=True
+        )
+
+        self.user = User.objects.create_user(
+            email="user@test.com",
+            password="User12345",
+            phone_number="09987654321"
+        )
+
+        self.category = Category.objects.create(
+            category_name="Shoes"
+        )
+
+        self.product = Product.objects.create(
+            name="Nike Shoes",
+            description="Running shoes",
+            price=55000,
+            stock=10,
+            category=self.category
+        )
+
+    def test_upload_product_image_successful(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        image_file = BytesIO()
+        image = Image.new(
+            "RGB",
+            (100, 100),
+            "red"
+        )
+        image.save(
+            image_file,
+            format="JPEG"
+        )
+
+        image_file.seek(0)
+        uploaded_image = SimpleUploadedFile(
+            "test.jpg",
+            image_file.read(),
+            content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            reverse("product-images"),
+            {
+                "product": self.product.id,
+                "image": uploaded_image,
+                "is_primary": True
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
+        
+        self.assertEqual(
+            ProductImage.objects.count(),
+            1
+        )
+
+        product_image = ProductImage.objects.first()
+
+        self.assertEqual(
+            product_image.product,
+            self.product
+        )
+
+        self.assertTrue(
+            product_image.is_primary
+        )
+        
+    def test_upload_product_image_unauthorized(self):
+        image_file = BytesIO()
+
+        image = Image.new(
+            "RGB",
+            (100, 100),
+            "red"
+        )
+
+        image.save(
+            image_file,
+            format="JPEG"
+        )
+
+        image_file.seek(0)
+
+        uploaded_image = SimpleUploadedFile(
+            "test.jpg",
+            image_file.read(),
+            content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            reverse("product-images"),
+            {
+                "product": self.product.id,
+                "image": uploaded_image,
+                "is_primary": True
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+        
+    def test_upload_product_image_by_user(self):
+        self.client.force_authenticate(
+            user=self.user
+        )
+
+        image_file = BytesIO()
+
+        image = Image.new(
+            "RGB",
+            (100, 100),
+            "red"
+        )
+
+        image.save(
+            image_file,
+            format="JPEG"
+        )
+
+        image_file.seek(0)
+
+        uploaded_image = SimpleUploadedFile(
+            "test.jpg",
+            image_file.read(),
+            content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            reverse("product-images"),
+            {
+                "product": self.product.id,
+                "image": uploaded_image,
+                "is_primary": True
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN
+        )
+        
+    def test_upload_product_image_with_invalid_product(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        image_file = BytesIO()
+
+        image = Image.new(
+            "RGB",
+            (100, 100),
+            "red"
+        )
+
+        image.save(
+            image_file,
+            format="JPEG"
+        )
+
+        image_file.seek(0)
+
+        uploaded_image = SimpleUploadedFile(
+            "test.jpg",
+            image_file.read(),
+            content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            reverse("product-images"),
+            {
+                "product": 9999,
+                "image": uploaded_image,
+                "is_primary": True
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+    def test_upload_second_primary_image(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        image_file = BytesIO()
+
+        image = Image.new(
+            "RGB",
+            (100, 100),
+            "red"
+        )
+
+        image.save(
+            image_file,
+            format="JPEG"
+        )
+
+        image_file.seek(0)
+
+        uploaded_image = SimpleUploadedFile(
+            "first.jpg",
+            image_file.read(),
+            content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            reverse("product-images"),
+            {
+                "product": self.product.id,
+                "image": uploaded_image,
+                "is_primary": True
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
+
+        image_file = BytesIO()
+
+        image = Image.new(
+            "RGB",
+            (100, 100),
+            "blue"
+        )
+
+        image.save(
+            image_file,
+            format="JPEG"
+        )
+
+        image_file.seek(0)
+
+        uploaded_image = SimpleUploadedFile(
+            "second.jpg",
+            image_file.read(),
+            content_type="image/jpeg"
+        )
+
+        response2 = self.client.post(
+            reverse("product-images"),
+            {
+                "product": self.product.id,
+                "image": uploaded_image,
+                "is_primary": True
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(
+            response2.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+        
+    def test_product_image_list(self):
+        response = self.client.get(
+            reverse("product-images")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+          
+    def test_product_image_detail(self):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=True
+        )
+
+        response = self.client.get(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["id"],
+            product_image.id
+        )
+
+        self.assertEqual(
+            response.data["product"],
+            self.product.id
+        )
+
+        self.assertTrue(
+            response.data["is_primary"]
+        )
+        
+        
+    def test_delete_product_image_successful(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=True
+        )
+
+        response = self.client.delete(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT
+        )
+
+        self.assertFalse(
+            ProductImage.objects.filter(
+                id=product_image.id
+            ).exists()
+        )
+         
+    def test_delete_product_image_by_user(self):
+        self.client.force_authenticate(
+            user=self.user
+        )
+
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=True
+        )
+
+        response = self.client.delete(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN
+        )
+
+        self.assertTrue(
+            ProductImage.objects.filter(
+                id=product_image.id
+            ).exists()
+        )
+
+    def test_delete_product_image_unauthorized(self):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=True
+        )
+
+        response = self.client.delete(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+        
+        
+    def test_update_product_image_successful(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=False
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            ),
+            {
+                "is_primary": True
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        product_image.refresh_from_db()
+
+        self.assertTrue(
+            product_image.is_primary
+        )
+        
+    def test_update_product_image_to_primary_when_primary_exists(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        primary_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/primary.jpg",
+            is_primary=True
+        )
+
+        second_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/second.jpg",
+            is_primary=False
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": second_image.id}
+            ),
+            {
+                "is_primary": True
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+        second_image.refresh_from_db()
+
+        self.assertFalse(
+            second_image.is_primary
+        )
+
+        primary_image.refresh_from_db()
+
+        self.assertTrue(
+            primary_image.is_primary
+        )
+        
+    def test_update_product_image_by_user(self):
+        self.client.force_authenticate(
+            user=self.user
+        )
+
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=False
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            ),
+            {
+                "is_primary": True
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN
+        )
+
+        product_image.refresh_from_db()
+
+        self.assertFalse(
+            product_image.is_primary
+        )
+        
+    def test_update_product_image_unauthorized(self):
+        product_image = ProductImage.objects.create(
+            product=self.product,
+            image="products/images/test.jpg",
+            is_primary=False
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-images-detail",
+                kwargs={"pk": product_image.id}
+            ),
+            {
+                "is_primary": True
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+
+        product_image.refresh_from_db()
+
+        self.assertFalse(
+            product_image.is_primary
+        )

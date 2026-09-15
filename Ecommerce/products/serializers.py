@@ -16,6 +16,7 @@ class CategorySerializer(serializers.ModelSerializer):
                 "Category name must have at least 2 characters."
             )
         return value
+
         
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,21 +28,32 @@ class ProductImageSerializer(serializers.ModelSerializer):
             "is_primary",
             "created_at",
         ]
-    
+        
     def validate(self, attrs):
         if attrs.get("is_primary"):
-            product = attrs["product"]
+            product = attrs.get("product")
 
-            if ProductImage.objects.filter(
+            if product is None and self.instance:
+                product = self.instance.product
+
+            queryset = ProductImage.objects.filter(
                 product=product,
                 is_primary=True
-            ).exists():
+            )
+
+            if self.instance:
+                queryset = queryset.exclude(
+                    id=self.instance.id
+                )
+
+            if queryset.exists():
                 raise serializers.ValidationError(
                     "This product already has a primary image."
                 )
 
         return attrs
-        
+    
+
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     category_id = serializers.PrimaryKeyRelatedField(
