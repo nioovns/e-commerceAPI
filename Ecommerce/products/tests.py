@@ -354,4 +354,572 @@ class CategoryAPITestCase(APITestCase):
             status.HTTP_401_UNAUTHORIZED
         )
         
+
+class ProductAPITestCase(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="admin@test.com",
+            password="Admin12345",
+            phone_number="09123456789",
+            is_staff=True
+        )
+
+        self.user = User.objects.create_user(
+            email="user@test.com",
+            password="User12345",
+            phone_number="09987654321"
+        )
+
+        self.category = Category.objects.create(
+            category_name="Shoes"
+        )
+
+        self.product = Product.objects.create(
+            name="Nike Shoes",
+            description="Running shoes",
+            price=55000,
+            stock=10,
+            category=self.category
+        )
+
+    def test_product_list(self):
+        response = self.client.get(
+            reverse("products")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+    
+    def test_product_detail(self):
+        response = self.client.get(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.assertEqual(
+            response.data["name"],
+            "Nike Shoes"
+        )
+
+        self.assertEqual(
+            response.data["stock"],
+            10
+        )
+       
+       
+    def test_create_product_successful(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
+
+        self.assertEqual(
+            Product.objects.count(),
+            2
+        )
+
+        product = Product.objects.get(
+            name="Laptop"
+        )
+
+        self.assertEqual(
+            product.price,
+            50000000
+        )
+
+        self.assertEqual(
+            product.stock,
+            5
+        )
+
+        self.assertEqual(
+            product.category,
+            self.category
+        )
+        
+    def test_create_product_unauthorized(self):
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+        
+    def test_create_product_by_user(self):
+        self.client.force_authenticate(
+            user=self.user
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN
+        )
+        
+    def test_create_product_with_invalid_name(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "A",
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+    def test_create_product_without_name(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+    def test_create_product_with_invalid_price(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": 0,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+    def test_create_product_with_negative_price(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": -5000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+    def test_create_product_with_negative_stock(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": -5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+    def test_create_product_with_invalid_category(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "description": "Gaming laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": 9999
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+    def test_create_product_without_description(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.post(
+            reverse("products"),
+            {
+                "name": "Laptop",
+                "price": 50000000,
+                "stock": 5,
+                "category_id": self.category.id
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+        
+        
+    def test_update_product_successful(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "name": "Updated Shoes",
+                "price": 75000,
+                "stock": 20
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.name,
+            "Updated Shoes"
+        )
+
+        self.assertEqual(
+            self.product.price,
+            75000
+        )
+
+        self.assertEqual(
+            self.product.stock,
+            20
+        )
+        
+    def test_update_product_by_user(self):
+        self.client.force_authenticate(
+            user=self.user
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "name": "Updated Shoes"
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.name,
+            "Nike Shoes"
+        )
+        
+    def test_update_product_unauthorized(self):
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "name": "Updated Shoes"
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )   
+        
+    def test_update_product_with_invalid_name(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "name": "A"
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.name,
+            "Nike Shoes"
+        )
+
+    def test_update_product_with_invalid_price(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "price": 0
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.price,
+            55000
+        )
+
+    def test_update_product_with_negative_price(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "price": -5000
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.price,
+            55000
+        )
+
+    def test_update_product_with_negative_stock(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "stock": -5
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.stock,
+            10
+        )
+
+    def test_update_product_with_invalid_category(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.patch(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            ),
+            {
+                "category_id": 9999
+            }
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.category,
+            self.category
+        )
+        
+        
+    def test_delete_product_successful(self):
+        self.client.force_authenticate(
+            user=self.admin
+        )
+
+        response = self.client.delete(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT
+        )
+
+        self.assertFalse(
+            Product.objects.filter(
+                id=self.product.id
+            ).exists()
+        )
+
+    def test_delete_product_by_user(self):
+        self.client.force_authenticate(
+            user=self.user
+        )
+
+        response = self.client.delete(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN
+        )
+
+        self.assertTrue(
+            Product.objects.filter(
+                id=self.product.id
+            ).exists()
+        )
+
+    def test_delete_product_unauthorized(self):
+        response = self.client.delete(
+            reverse(
+                "product-detail",
+                kwargs={"pk": self.product.id}
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED
+        )
+        
     
