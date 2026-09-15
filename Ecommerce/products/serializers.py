@@ -9,6 +9,13 @@ class CategorySerializer(serializers.ModelSerializer):
             "id",
             "category_name",
         ]    
+    
+    def validate_category_name(self, value):
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError(
+                "Category name must have at least 2 characters."
+            )
+        return value
         
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,6 +27,20 @@ class ProductImageSerializer(serializers.ModelSerializer):
             "is_primary",
             "created_at",
         ]
+    
+    def validate(self, attrs):
+        if attrs.get("is_primary"):
+            product = attrs["product"]
+
+            if ProductImage.objects.filter(
+                product=product,
+                is_primary=True
+            ).exists():
+                raise serializers.ValidationError(
+                    "This product already has a primary image."
+                )
+
+        return attrs
         
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
@@ -49,6 +70,21 @@ class ProductSerializer(serializers.ModelSerializer):
             "updated_at",
             "is_active",
         ]
+        
+    def validate_name(self, value):
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError(
+                "Product name must have at least 2 characters."
+            )
+        return value
+    
+    def validate_price(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Price must be greater than zero."
+            )
+        return value
+        
         
 class ProductImageUploadSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(
